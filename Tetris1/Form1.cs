@@ -159,11 +159,6 @@ namespace Tetris1
                 else
                     game.PauseGame();
             }
-            // For debug purposes
-            if( keyData == Keys.D)
-            {
-                return true;
-            }
 
             if (keyData == Keys.Escape)
             {

@@ -138,6 +138,7 @@ namespace Tetris1
             BackgroundRect = new Rectangle(WellX - 20, WellY + WellH / 4, WellW + 40, WellH / 3);
 
             scoreLoc = new PointF(WellX + WellW + 20, WellY + 40 + 4 * PreviewCellSize);
+            score = 0;
 
             // Add tetromino piece
             cPiece = new Tetramino(Tetramino.GetRandomType(), StartPos, Tetramino.GameState.active);
@@ -379,7 +380,7 @@ namespace Tetris1
         private void CheckFullRow()
         {
             List<int> rows = new List<int>();
-            for (int y = 0; y < 210; y += 10)
+            for (int y = 200; y >= 0; y -= 10)
             {
                 for (int x = 0; x < 10; x++)
                 {
@@ -459,6 +460,7 @@ namespace Tetris1
             if( cGameState == GameState.GameOver)
             {
                 cGameState = GameState.Running;
+                this.Start();
             }
         }
 
