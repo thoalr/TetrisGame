@@ -142,7 +142,9 @@ namespace Tetris1
             }
             if (keyData == Keys.Space)
             {
-                game.HardDrop();
+                if (game.IsGameOver()) game.RestartGame();
+                else
+                    game.HardDrop();
                 return true;
             }
             if ( keyData == Keys.S)
@@ -153,18 +155,11 @@ namespace Tetris1
 
             if (keyData == Keys.P)
             {
-                if (game.cGameState == TetrisGame.GameState.Running)
-                {
-                    game.cGameState = TetrisGame.GameState.Pause;
-                    return true;
-                }
-
-                if (game.cGameState == TetrisGame.GameState.Pause)
-                {
-                    game.cGameState = TetrisGame.GameState.Running;
-                    return true;
-                }
+                if (game.IsPaused()) game.ResumeGame();
+                else
+                    game.PauseGame();
             }
+            // For debug purposes
             if( keyData == Keys.D)
             {
                 return true;
@@ -173,7 +168,7 @@ namespace Tetris1
             if (keyData == Keys.Escape)
             {
                 game.Canvas.Hide();
-                game.cGameState = TetrisGame.GameState.Stop;
+                game.StopGame();
                 menu.Show();
                 return true;
             }
@@ -183,7 +178,7 @@ namespace Tetris1
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            game.cGameState = TetrisGame.GameState.Stop;  // Allow thread to come to an end
+            game.StopGame();  // Allow thread to come to an end
         }
     }
 }

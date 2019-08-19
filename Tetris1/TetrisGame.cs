@@ -18,7 +18,7 @@ namespace Tetris1
             Running, Pause, Stop, GameOver
         }
 
-        public GameState cGameState;
+        private GameState cGameState;
         // Start tetrominoes in row 22
         Point StartPos = new Point(4, 22);
         //Panel that will be drawn on
@@ -46,6 +46,11 @@ namespace Tetris1
 
         SolidBrush BlackBrush = new SolidBrush(Color.Black);
         Font GameFont = new System.Drawing.Font("Arial", 16);
+
+        // Game Over and Paused screen
+        Font BigFont = new System.Drawing.Font("Arial", 26);
+        PointF BigTextLoc;
+        Rectangle BackgroundRect;
 
         public Thread GameThread;
 
@@ -89,7 +94,6 @@ namespace Tetris1
                 Thread.Sleep(3);
             }
             DropTimer.Stop();
-            cGameState = GameState.Stop;
         }
 
         private void NextPiece()
@@ -128,6 +132,10 @@ namespace Tetris1
                 NextRect[i] = new Rectangle(nextX + (i%4)*PreviewCellSize, nextholdY - (PreviewCellSize * (i / 4)), PreviewCellSize,PreviewCellSize);
                 HoldRect[i] = new Rectangle(holdX + (i%4)*PreviewCellSize, nextholdY - (PreviewCellSize * (i / 4)), PreviewCellSize, PreviewCellSize);
             }
+
+            // Setup for Game over and Paused screen
+            BigTextLoc = new PointF(WellX + WellW / 4, WellY + 4 * WellH / 12);
+            BackgroundRect = new Rectangle(WellX - 20, WellY + WellH / 4, WellW + 40, WellH / 3);
 
             scoreLoc = new PointF(WellX + WellW + 20, WellY + 40 + 4 * PreviewCellSize);
 
@@ -177,6 +185,29 @@ namespace Tetris1
             e.Graphics.DrawString("Score: " + score, GameFont, BlackBrush, scoreLoc);
             DrawNextPiece(e);
             DrawHoldPiece(e);
+
+            DrawPause(e);
+            DrawGameOver(e);
+        }
+
+        private void DrawGameOver(PaintEventArgs e)
+        {
+            if (cGameState == GameState.GameOver)
+            {
+                e.Graphics.FillRectangle(new SolidBrush(Color.Gray), BackgroundRect);
+                e.Graphics.DrawString("Game Over", BigFont, BlackBrush, BigTextLoc);
+
+                e.Graphics.DrawString("Your score is: " + score, GameFont, BlackBrush, PointF.Add(BigTextLoc, new Size(-20,60)));
+            }
+        }
+
+        private void DrawPause(PaintEventArgs e)
+        {
+            if (cGameState == GameState.Pause)
+            {
+                e.Graphics.FillRectangle(new SolidBrush(Color.Gray),BackgroundRect);
+                e.Graphics.DrawString("Paused", BigFont, BlackBrush, PointF.Add(BigTextLoc, new Size(30, 20)));
+            }
         }
 
         private void DrawHoldPiece(PaintEventArgs e)
@@ -227,77 +258,95 @@ namespace Tetris1
 
         public void MoveLeft()
         {
-            cPiece.Loc.X -= 1;
-            if (cPiece.Loc.X + cPiece.minX() < 0 || CheckWellCollision()) cPiece.Loc.X++;
+            if (cGameState == GameState.Running)
+            {
+                cPiece.Loc.X -= 1;
+                if (cPiece.Loc.X + cPiece.minX() < 0 || CheckWellCollision()) cPiece.Loc.X++;
+            }
         }
         public void MoveRight()
         {
-            cPiece.Loc.X++;
-            if (cPiece.Loc.X + cPiece.maxX() >= 10) cPiece.Loc.X = 9 - cPiece.maxX();
-            if (CheckWellCollision())
+            if (cGameState == GameState.Running)
             {
-                cPiece.Loc.X--;
+                cPiece.Loc.X++;
+                if (cPiece.Loc.X + cPiece.maxX() >= 10) cPiece.Loc.X = 9 - cPiece.maxX();
+                if (CheckWellCollision())
+                {
+                    cPiece.Loc.X--;
+                }
             }
         }
 
         public void DropDown()
         {
-            cPiece.Loc.Y--;
-            if (cPiece.Loc.Y < 0) cPiece.Loc.Y = 0;
-            if (CheckWellCollision())
+            if (cGameState == GameState.Running)
             {
-                cPiece.Loc.Y++;
+                cPiece.Loc.Y--;
+                if (cPiece.Loc.Y < 0) cPiece.Loc.Y = 0;
+                if (CheckWellCollision())
+                {
+                    cPiece.Loc.Y++;
+                }
             }
         }
         
         public void HardDrop()
         {
-            while(!CheckWellCollision())
+            if (cGameState == GameState.Running)
             {
-                cPiece.Loc.Y--;
+                while (!CheckWellCollision())
+                {
+                    cPiece.Loc.Y--;
+                }
+                cPiece.Loc.Y++;
             }
-            cPiece.Loc.Y++;
         }
 
         public void HoldPiece()
         {
-            if(hPiece.GetTypeIndex() == (int)Tetramino.TetraType.Empty)
+            if (cGameState == GameState.Running)
             {
-                hPiece = cPiece;
-                hPiece.cGameState = Tetramino.GameState.hold;
-                this.NextPiece();
-                cPiece.Loc = hPiece.Loc;
-            }
-            else
-            {
-                Tetramino tmpPiece = hPiece;
-                tmpPiece.cGameState = Tetramino.GameState.active;
-                tmpPiece.Loc = cPiece.Loc;
-                hPiece = cPiece;
-                hPiece.cGameState = Tetramino.GameState.hold;
-                cPiece = tmpPiece;
-            }
-            while(CheckWellCollision())
-            {
-                RotatePiece();
-                if (CheckWellCollision()) RotatePiece();
-                else return;
-                if (CheckWellCollision()) RotatePiece();
-                else return;
-                if (CheckWellCollision()) RotatePiece();
-                else return;
-                cPiece.Loc.Y++;
+                if (hPiece.GetTypeIndex() == (int)Tetramino.TetraType.Empty)
+                {
+                    hPiece = cPiece;
+                    hPiece.cGameState = Tetramino.GameState.hold;
+                    this.NextPiece();
+                    cPiece.Loc = hPiece.Loc;
+                }
+                else
+                {
+                    Tetramino tmpPiece = hPiece;
+                    tmpPiece.cGameState = Tetramino.GameState.active;
+                    tmpPiece.Loc = cPiece.Loc;
+                    hPiece = cPiece;
+                    hPiece.cGameState = Tetramino.GameState.hold;
+                    cPiece = tmpPiece;
+                }
+                while (CheckWellCollision())
+                {
+                    RotatePiece();
+                    if (CheckWellCollision()) RotatePiece();
+                    else return;
+                    if (CheckWellCollision()) RotatePiece();
+                    else return;
+                    if (CheckWellCollision()) RotatePiece();
+                    else return;
+                    cPiece.Loc.Y++;
+                }
             }
         }
 
         public void RotatePiece()
         {
-            cPiece.Rotate();
-            if (CheckWellCollision())
+            if (cGameState == GameState.Running)
             {
                 cPiece.Rotate();
-                cPiece.Rotate();
-                cPiece.Rotate();
+                if (CheckWellCollision())
+                {
+                    cPiece.Rotate();
+                    cPiece.Rotate();
+                    cPiece.Rotate();
+                }
             }
         }
 
@@ -321,6 +370,8 @@ namespace Tetris1
             {
                 if (indecies[i] < 210)
                     WellColor[indecies[i]] = new SolidBrush(cPiece.GetColor());
+                else if (indecies[i] < 300)
+                    GameOver();
             }
             NextPiece();
         }
@@ -374,7 +425,23 @@ namespace Tetris1
 
         public void PauseGame()
         {
-            cGameState = GameState.Pause;
+            if (cGameState == GameState.Running)
+            {
+                cGameState = GameState.Pause;
+            }
+        }
+
+        public bool IsPaused()
+        {
+            return cGameState == GameState.Pause;
+        }
+
+        public void ResumeGame()
+        {
+            if (cGameState == GameState.Pause)
+            {
+                cGameState = GameState.Running;
+            }
         }
 
         public void GameOver()
@@ -382,9 +449,22 @@ namespace Tetris1
             cGameState = GameState.GameOver;
         }
 
+        public bool IsGameOver()
+        {
+            return cGameState == GameState.GameOver;
+        }
+
         public void RestartGame()
         {
+            if( cGameState == GameState.GameOver)
+            {
+                cGameState = GameState.Running;
+            }
+        }
 
+        public void StopGame()
+        {
+            cGameState = GameState.Stop;
         }
 
         // Convert from 2d to 1d
