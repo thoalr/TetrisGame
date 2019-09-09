@@ -103,8 +103,8 @@ namespace Tetris1
             score = 0;
 
             // Add tetromino piece
-            cPiece = new Tetramino(Tetramino.GetRandomType(), StartPos, Tetramino.PieceState.active);
-            nPiece = new Tetramino(Tetramino.GetRandomType(), new Point(), Tetramino.PieceState.next);
+            cPiece = new Tetramino(Tetramino.GetRandomType(0), StartPos, Tetramino.PieceState.active);
+            nPiece = new Tetramino(Tetramino.GetRandomType(1), new Point(), Tetramino.PieceState.next);
             hPiece = new Tetramino(Tetramino.TetraType.Empty, new Point(), Tetramino.PieceState.hold);
 
             GameThread = new Thread(GameTick);
@@ -122,7 +122,7 @@ namespace Tetris1
             {
                 if (cGameState == GameState.Running)
                 {
-                    if(DateTime.Now.Ticks - time0 > TimeSpan.TicksPerMillisecond*(500 - (score/50)))
+                    if(DateTime.Now.Ticks - time0 > TimeSpan.TicksPerMillisecond*(800 - (score/50)))
                     {
                         // Clear all full rows
                         ClearRows();
@@ -173,16 +173,14 @@ namespace Tetris1
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.MoveLeft();
-                if (cPiece.LeftestX() < 0 || CheckWellCollision()) cPiece.MoveRight();
+                if (!MoveCollision(new Point(-1, 0))) cPiece.MoveLeft();
             }
         }
         public void MoveRight()
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.MoveRight();
-                if (cPiece.RightestX() >= 10 || CheckWellCollision()) cPiece.MoveLeft();
+                if (!MoveCollision(new Point(1, 0))) cPiece.MoveRight();
             }
         }
 
@@ -190,8 +188,7 @@ namespace Tetris1
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.Drop();
-                if (cPiece.LowestY() < 0 || CheckWellCollision()) cPiece.MoveUp();
+                if (!MoveCollision(new Point(0, -1))) cPiece.Drop();
             }
         }
         
@@ -199,11 +196,10 @@ namespace Tetris1
         {
             if (cGameState == GameState.Running)
             {
-                while (!CheckWellCollision())
+                while (!MoveCollision(new Point(0, -1)))
                 {
                     cPiece.Drop();
                 }
-                cPiece.MoveUp();
             }
         }
 
@@ -224,14 +220,14 @@ namespace Tetris1
                     cPiece = tmpPiece.Activate(cPiece.GetLocation());
 
                     // FIX
-                    while (CheckWellCollision())
+                    while (MoveCollision(new Point(0,0)))
                     {
                         RotatePiece();
-                        if (CheckWellCollision()) RotatePiece();
+                        if (MoveCollision(new Point(0,0))) RotatePiece();
                         else return;
-                        if (CheckWellCollision()) RotatePiece();
+                        if (MoveCollision(new Point(0,0))) RotatePiece();
                         else return;
-                        if (CheckWellCollision()) RotatePiece();
+                        if (MoveCollision(new Point(0,0))) RotatePiece();
                         else return;
                         cPiece.MoveUp();
                     }
@@ -245,24 +241,11 @@ namespace Tetris1
             if (cGameState == GameState.Running)
             {
                 cPiece.Rotate();
-                while (CheckWellCollision())
+                while (MoveCollision(new Point(0,0)))
                 {
                     cPiece.Rotate();
                 }
             }
-        }
-
-        bool CheckWellCollision()
-        {
-            int[] indecies = cPiece.GetIndecies();
-            for (int i = 0; i < 4; i++)
-            {
-                if (indecies[i] == 500 || indecies[i] < 0) return true;
-                if (indecies[i] < 210)
-                        if (!WellColor[indecies[i]].Equals(BlackBrush))
-                            return true;
-            }
-            return false;
         }
 
         private void NextPiece()
@@ -276,6 +259,11 @@ namespace Tetris1
             // Test 5 positions
             // This is to move the tetramino to different positions based on its rotation state
             // https://tetris.fandom.com/wiki/SRS
+
+
+
+
+
         }
 
         /** ScoreVal

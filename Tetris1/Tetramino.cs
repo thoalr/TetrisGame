@@ -112,15 +112,15 @@ namespace Tetris1
             }
         }
 
-        static public TetraType GetRandomType()
+        static public TetraType GetRandomType(int i)
         {
-            Random r = new Random();
+            Random r = new Random((int)DateTime.Now.Ticks + i);
             return (TetraType)r.Next(7);
         }
 
         static public Tetramino NextPiece()
         {
-            return new Tetramino(GetRandomType(), new Point(), PieceState.next);
+            return new Tetramino(GetRandomType(0), new Point(), PieceState.next);
         }
 
         // Returns indecies based on current state of object
@@ -194,7 +194,7 @@ namespace Tetris1
                 }
         }
 
-        public Point[] PreviewRotation(int n)
+        public int[] PreviewRotation(int n)
         {
             Point[] tmp = new Point[4];
             tmp = this.cShape;
@@ -228,7 +228,15 @@ namespace Tetris1
                         tmp[i].Y = (5 - x) % 3;
                     }
             }
-            return tmp;
+            int[] list = new int[4];
+            for (int i = 0; i < 4; i++)
+            {
+                list[i] = Loc.X + tmp[i].X + (Loc.Y + tmp[i].Y) * 10;
+                if (Loc.Y + tmp[i].Y > 21) list[i] = 501; // If it is above the well
+                if (Loc.X + tmp[i].X >= 10 || Loc.X + tmp[i].X < 0) list[i] = 500; // If it is outside the well
+
+            }
+            return list;
         }
 
         public int[] PreviewMove(Point p)
@@ -237,8 +245,8 @@ namespace Tetris1
             for (int i = 0; i < 4; i++)
             {
                 list[i] = Loc.X + p.X + cShape[i].X + (Loc.Y + p.Y + cShape[i].Y) * 10;
-                if (Loc.X + p.X + cShape[i].X >= 10 || Loc.X + p.X  + cShape[i].X < 0) list[i] = 500; // If it is outside the well
-                if (Loc.Y + p.Y + cShape[i].Y > 21) list[i] = 501; // If it is above the well
+                if (Loc.Y + p.Y + cShape[i].Y >= 21) list[i] = 501; // If it is above the well
+                if (Loc.X + p.X + cShape[i].X >= 10 || Loc.X + p.X + cShape[i].X < 0) list[i] = 500; // If it is outside the well
             }
             return list;
         }
