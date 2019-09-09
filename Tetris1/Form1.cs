@@ -106,18 +106,18 @@ namespace Tetris1
             this.Close();
         }
 
+        // Start the game
         private void Button1_Click(object sender, EventArgs e)
         {
-            menu.Hide();
             game.Setup();
+            menu.Hide();
             this.Controls.Add(game.Canvas);
-            
             game.Start();
         }
 
 
         // key event handler
-        // up down left right space and hold button
+        // up down left right space, escape, pause and hold button
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == Keys.Up)

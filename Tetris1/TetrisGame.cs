@@ -11,7 +11,7 @@ using System.Diagnostics;
 
 namespace Tetris1
 {
-    class TetrisGame
+    public partial class TetrisGame
     {
         public enum GameState
         {
@@ -29,80 +29,42 @@ namespace Tetris1
         Tetramino nPiece;
         // hold piece
         Tetramino hPiece;
-        // well   10 width, 21 height
-        SolidBrush[] WellColor = new SolidBrush[210]; // Color for each cell
-        Rectangle[] WellRect;                         // Rectangle for each cell
-        // Next piece preview
-        Rectangle[] NextRect;
-        // Hold piece preview
-        Rectangle[] HoldRect;
-        const int PreviewCellSize = 30;
-        // Stopwatch for drop
-        Stopwatch DropTimer;
-
-        // score
-        int score;
-        PointF scoreLoc;
 
         SolidBrush BlackBrush = new SolidBrush(Color.Black);
-        Font GameFont = new System.Drawing.Font("Arial", 16);
 
-        // Game Over and Paused screen
-        Font BigFont = new System.Drawing.Font("Arial", 26);
-        PointF BigTextLoc;
-        Rectangle BackgroundRect;
+        // Make queue for inputs
+        // Disable inputs when doing important long tasks e.g. painting
+
 
         public Thread GameThread;
 
         // constructor
         public TetrisGame()
         {
-            score = 0;
+            Setup();
+
             cGameState = GameState.Stop;
+   
         }
 
-        // Game tick update
-        private void GameTick()
+        // Setup function
+        public void Setup()
         {
-            DropTimer.Start();
-            while (cGameState != GameState.Stop)
-            {
-                if (cGameState == GameState.Running)
-                {
-                    // Check full lines
-                    CheckFullRow();
-                    // Drop down piece
-                    DropTimer.Stop();
-                    if (DropTimer.ElapsedMilliseconds > (500 - score / 50))
-                    {
-                        cPiece.Loc.Y--;
-                        DropTimer.Reset();
-                    }
-                    else DropTimer.Start();
+            Canvas = new Panel();
+            Canvas.Location = new System.Drawing.Point(0, 0);
+            Canvas.Name = "Canvas";
+            Canvas.Size = new System.Drawing.Size(400, 300);
+            Canvas.TabIndex = 0;
+            Canvas.Dock = DockStyle.Fill;
 
-                    // Attach piece to well
-                    if (CheckWellCollision())
-                    {
-                        cPiece.Loc.Y++;
-                        AttachPiece();
-                    }
-                    if (cPiece.Loc.Y == 0) AttachPiece();
+            typeof(Panel).InvokeMember("DoubleBuffered", 
+                BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.NonPublic,
+                null, Canvas, new object[] { true });
 
-                    // Check for fully completed rows and clear them  update score
-                }
-                Canvas.Invalidate();
-                Thread.Sleep(3);
-            }
-            DropTimer.Stop();
+            Canvas.Paint += Canvas_Paint;
         }
 
-        private void NextPiece()
-        {
-            nPiece.Loc = StartPos;
-            nPiece.cGameState = Tetramino.GameState.active;
-            cPiece = nPiece;
-            nPiece = new Tetramino(Tetramino.GetRandomType(), new Point(), Tetramino.GameState.next);
-        }
+
 
         // Start function
         public void Start()
@@ -141,140 +103,86 @@ namespace Tetris1
             score = 0;
 
             // Add tetromino piece
-            cPiece = new Tetramino(Tetramino.GetRandomType(), StartPos, Tetramino.GameState.active);
-            nPiece = new Tetramino(Tetramino.GetRandomType(), new Point(), Tetramino.GameState.next);
-            hPiece = new Tetramino(Tetramino.TetraType.Empty, new Point(), Tetramino.GameState.hold);
+            cPiece = new Tetramino(Tetramino.GetRandomType(), StartPos, Tetramino.PieceState.active);
+            nPiece = new Tetramino(Tetramino.GetRandomType(), new Point(), Tetramino.PieceState.next);
+            hPiece = new Tetramino(Tetramino.TetraType.Empty, new Point(), Tetramino.PieceState.hold);
 
             GameThread = new Thread(GameTick);
             cGameState = GameState.Running;
-            DropTimer = new Stopwatch();
             GameThread.Start();
         }
 
-        // Setup function
-        public void Setup()
+
+        // Game tick update
+        private void GameTick()
         {
-            Canvas = new Panel();
-            Canvas.Location = new System.Drawing.Point(0, 0);
-            Canvas.Name = "Canvas";
-            Canvas.Size = new System.Drawing.Size(400, 300);
-            Canvas.TabIndex = 0;
-            Canvas.Dock = DockStyle.Fill;
+            long time0 = DateTime.Now.Ticks;
 
-            typeof(Panel).InvokeMember("DoubleBuffered", BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.NonPublic,
-            null, Canvas, new object[] { true });
+            while (cGameState != GameState.Stop)
+            {
+                if (cGameState == GameState.Running)
+                {
+                    if(DateTime.Now.Ticks - time0 > TimeSpan.TicksPerMillisecond*(500 - (score/50)))
+                    {
+                        // Clear all full rows
+                        ClearRows();
 
-            Canvas.Paint += Canvas_Paint;
+                        // Attach piece if it collides with pieces in well
+                        if (MoveCollision(new Point(0,-1)))
+                        {
+                            AttachPiece();
+                        }
+                        // Check full rows
+                        CheckRows();
+                        //Drop down only if it doesnt overlap with piece
+                        DropDown();
+                        time0 = DateTime.Now.Ticks;
+                    }
+                }
+                Canvas.Invalidate();
+                Thread.Sleep(1);
+            }
         }
-
 
         // Draw function
         private void Canvas_Paint(object sender, PaintEventArgs e)
         {
             e.Graphics.Clear(Color.LightGray);
+            
             // Draw Well backround
             for (int i = 0; i < 210; i++)
             {
                 e.Graphics.FillRectangle(WellColor[i], WellRect[i]);
             }
-            // Draw current piece
-            this.Piece_Paint(e);
+
+            RenderPiece(e.Graphics);
+
             // Draw Well grid
             e.Graphics.DrawRectangles(new Pen(Color.DarkBlue), WellRect);
 
-            // HUD
-            e.Graphics.DrawString("Score: " + score, GameFont, BlackBrush, scoreLoc);
-            DrawNextPiece(e);
-            DrawHoldPiece(e);
-
-            DrawPause(e);
-            DrawGameOver(e);
+            // Draw UI
+            RenderHoldPiece(e.Graphics);
+            RenderNextPiece(e.Graphics);
+            RenderScore(e.Graphics);
+            if (cGameState.Equals(GameState.Pause)) RenderPause(e.Graphics);
+            if (cGameState.Equals(GameState.GameOver)) RenderGameover(e.Graphics);
         }
 
-        private void DrawGameOver(PaintEventArgs e)
-        {
-            if (cGameState == GameState.GameOver)
-            {
-                e.Graphics.FillRectangle(new SolidBrush(Color.Gray), BackgroundRect);
-                e.Graphics.DrawString("Game Over", BigFont, BlackBrush, BigTextLoc);
-
-                e.Graphics.DrawString("Your score is: " + score, GameFont, BlackBrush, PointF.Add(BigTextLoc, new Size(-20,60)));
-            }
-        }
-
-        private void DrawPause(PaintEventArgs e)
-        {
-            if (cGameState == GameState.Pause)
-            {
-                e.Graphics.FillRectangle(new SolidBrush(Color.Gray),BackgroundRect);
-                e.Graphics.DrawString("Paused", BigFont, BlackBrush, PointF.Add(BigTextLoc, new Size(30, 20)));
-            }
-        }
-
-        private void DrawHoldPiece(PaintEventArgs e)
-        {
-            for (int i = 0; i < 16; i++)
-            {
-                e.Graphics.FillRectangle(BlackBrush, HoldRect[i]);
-            }
-            if (hPiece.GetTypeIndex() != (int)Tetramino.TetraType.Empty)
-            {
-                int[] pieceD = hPiece.GetPreviewIndex();
-                SolidBrush pieceB = new SolidBrush(hPiece.GetColor());
-                for (int i = 0; i < 4; i++)
-                {
-                    if (pieceD[i] < 16)
-                        e.Graphics.FillRectangle(pieceB, HoldRect[pieceD[i]]);
-                }
-            }
-            e.Graphics.DrawRectangles(new Pen(Color.DarkBlue), HoldRect);
-        }
-
-        private void DrawNextPiece(PaintEventArgs e)
-        {
-            for (int i = 0; i < 16; i++)
-            {
-                e.Graphics.FillRectangle(BlackBrush, NextRect[i]);
-            }
-            int[] pieceD = nPiece.GetPreviewIndex();
-            SolidBrush pieceB = new SolidBrush(nPiece.GetColor());
-            for (int i = 0; i < 4; i++)
-            {
-                if (pieceD[i] < 16)
-                    e.Graphics.FillRectangle(pieceB, NextRect[pieceD[i]]);
-            }
-            e.Graphics.DrawRectangles(new Pen(Color.DarkBlue), NextRect);
-        }
-
-        private void Piece_Paint(PaintEventArgs e)
-        {
-            int[] pieceD = cPiece.GetWellRectIndex();
-            SolidBrush pieceB = new SolidBrush(cPiece.GetColor());
-            for (int i = 0; i < 4; i++)
-            {
-                if (pieceD[i] < 210)
-                    e.Graphics.FillRectangle(pieceB, WellRect[pieceD[i]]);
-            }
-        }
 
         public void MoveLeft()
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.Loc.X -= 1;
-                if (cPiece.Loc.X + cPiece.minX() < 0 || CheckWellCollision()) cPiece.Loc.X++;
+                cPiece.MoveLeft();
+                if (cPiece.LeftestX() < 0 || CheckWellCollision()) cPiece.MoveRight();
             }
         }
         public void MoveRight()
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.Loc.X++;
-                if (cPiece.Loc.X + cPiece.maxX() >= 10) cPiece.Loc.X = 9 - cPiece.maxX();
-                if (CheckWellCollision())
-                {
-                    cPiece.Loc.X--;
-                }
+                cPiece.MoveRight();
+                if (cPiece.RightestX() >= 10 || CheckWellCollision()) cPiece.MoveLeft();
             }
         }
 
@@ -282,12 +190,8 @@ namespace Tetris1
         {
             if (cGameState == GameState.Running)
             {
-                cPiece.Loc.Y--;
-                if (cPiece.Loc.Y < 0) cPiece.Loc.Y = 0;
-                if (CheckWellCollision())
-                {
-                    cPiece.Loc.Y++;
-                }
+                cPiece.Drop();
+                if (cPiece.LowestY() < 0 || CheckWellCollision()) cPiece.MoveUp();
             }
         }
         
@@ -297,9 +201,9 @@ namespace Tetris1
             {
                 while (!CheckWellCollision())
                 {
-                    cPiece.Loc.Y--;
+                    cPiece.Drop();
                 }
-                cPiece.Loc.Y++;
+                cPiece.MoveUp();
             }
         }
 
@@ -307,45 +211,42 @@ namespace Tetris1
         {
             if (cGameState == GameState.Running)
             {
-                if (hPiece.GetTypeIndex() == (int)Tetramino.TetraType.Empty)
+                if (hPiece.GetTetraType().Equals(Tetramino.TetraType.Empty))
                 {
-                    hPiece = cPiece;
-                    hPiece.cGameState = Tetramino.GameState.hold;
-                    this.NextPiece();
-                    cPiece.Loc = hPiece.Loc;
+                    hPiece = cPiece.Hold();
+                    cPiece = nPiece.Activate(StartPos);
+                    nPiece = Tetramino.NextPiece();
                 }
                 else
                 {
                     Tetramino tmpPiece = hPiece;
-                    tmpPiece.cGameState = Tetramino.GameState.active;
-                    tmpPiece.Loc = cPiece.Loc;
-                    hPiece = cPiece;
-                    hPiece.cGameState = Tetramino.GameState.hold;
-                    cPiece = tmpPiece;
-                }
-                while (CheckWellCollision())
-                {
-                    RotatePiece();
-                    if (CheckWellCollision()) RotatePiece();
-                    else return;
-                    if (CheckWellCollision()) RotatePiece();
-                    else return;
-                    if (CheckWellCollision()) RotatePiece();
-                    else return;
-                    cPiece.Loc.Y++;
+                    hPiece = cPiece.Hold();
+                    cPiece = tmpPiece.Activate(cPiece.GetLocation());
+
+                    // FIX
+                    while (CheckWellCollision())
+                    {
+                        RotatePiece();
+                        if (CheckWellCollision()) RotatePiece();
+                        else return;
+                        if (CheckWellCollision()) RotatePiece();
+                        else return;
+                        if (CheckWellCollision()) RotatePiece();
+                        else return;
+                        cPiece.MoveUp();
+                    }
                 }
             }
         }
 
         public void RotatePiece()
         {
+            // FIX
             if (cGameState == GameState.Running)
             {
                 cPiece.Rotate();
-                if (CheckWellCollision())
+                while (CheckWellCollision())
                 {
-                    cPiece.Rotate();
-                    cPiece.Rotate();
                     cPiece.Rotate();
                 }
             }
@@ -353,7 +254,7 @@ namespace Tetris1
 
         bool CheckWellCollision()
         {
-            int[] indecies = cPiece.GetWellRectIndex();
+            int[] indecies = cPiece.GetIndecies();
             for (int i = 0; i < 4; i++)
             {
                 if (indecies[i] == 500 || indecies[i] < 0) return true;
@@ -364,49 +265,24 @@ namespace Tetris1
             return false;
         }
 
-        private void AttachPiece()
+        private void NextPiece()
         {
-            int[] indecies = cPiece.GetWellRectIndex();
-            for (int i = 0; i < 4; i++)
-            {
-                if (indecies[i] < 210)
-                    WellColor[indecies[i]] = new SolidBrush(cPiece.GetColor());
-                else if (indecies[i] < 300)
-                    GameOver();
-            }
-            NextPiece();
+            cPiece = nPiece.Activate(StartPos);
+            nPiece = Tetramino.NextPiece();
         }
 
-        private void CheckFullRow()
+        private void WallKick()
         {
-            List<int> rows = new List<int>();
-            for (int y = 200; y >= 0; y -= 10)
-            {
-                for (int x = 0; x < 10; x++)
-                {
-                    if (WellColor[x + y].Equals(BlackBrush)) break;
-                    if (x == 9) // The entire row is full
-                    {
-                        rows.Add(y);
-                    }
-                }
-            }
-            score += ScoreVal(rows.Count());
-            foreach (int row in rows)
-            {
-                for (int y = row; y < 210; y += 10)
-                {
-                    for (int x = 0; x < 10; x++)
-                    {
-                        if (x + y + 10 >= 210)
-                            WellColor[x + y] = BlackBrush;
-                        else
-                            WellColor[x + y] = WellColor[x + y + 10];
-                    }
-                }
-            }
+            // Test 5 positions
+            // This is to move the tetramino to different positions based on its rotation state
+            // https://tetris.fandom.com/wiki/SRS
         }
 
+        /** ScoreVal
+         * Returns the score to be awarded for clearing rows
+         * input: n - number of rows cleared
+         * ouput: the corresponing score
+         */
         int ScoreVal(int n)
         {
             switch (n)
@@ -468,6 +344,7 @@ namespace Tetris1
         {
             cGameState = GameState.Stop;
         }
+
 
         // Convert from 2d to 1d
         public static int map2to1(int x, int y, int width)
