@@ -140,7 +140,7 @@ namespace Tetris1
                     }
                 }
                 Canvas.Invalidate();
-                Thread.Sleep(1);
+                Thread.Sleep(17);
             }
         }
 
